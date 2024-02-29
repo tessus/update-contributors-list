@@ -1,0 +1,45 @@
+name: 'Update CONTRIBUTORS List'
+description: 'Update (or create) the CONTRIBUTORS text file (list of names and email addresses)'
+author: 'Helmut K. C. Tessarek <tessarek@evermeet.cx>'
+branding:
+  icon: 'list'
+  color: 'blue'
+runs:
+  using: "composite"
+  steps:
+    - name: Check Runner OS
+      if: ${{ runner.os != 'Linux' }}
+      shell: bash
+      run: |
+        echo "This action must be run on Linux."
+        exit 1
+
+    - name: Checkout Repo
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Retrieve contributors and update file
+      run: |
+        git log --pretty='%an <%ae>' |sort -uf |grep -v "\[bot\]" >CONTRIBUTORS
+
+    - name: Setup git config
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+    - name: Check for modified file
+      id: git-check
+      run: |
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "FILE_MODIFIED=true" >> $GITHUB_OUTPUT
+        else
+          echo "FILE_MODIFIED=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Commit updated CONTRIBUTORS
+      if: steps.git-check.outputs.FILE_MODIFIED == 'true'
+      run: |
+        git add CONTRIBUTORS
+        git commit -m "chore: update CONTRIBUTORS"
+        git push
