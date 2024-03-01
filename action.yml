@@ -20,16 +20,19 @@ runs:
         fetch-depth: 0
 
     - name: Retrieve contributors and update file
+      shell: bash
       run: |
         git log --pretty='%an <%ae>' |sort -uf |grep -v "\[bot\]" >CONTRIBUTORS
 
     - name: Setup git config
+      shell: bash
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
 
     - name: Check for modified file
       id: git-check
+      shell: bash
       run: |
         if [ -n "$(git status --porcelain)" ]; then
           echo "FILE_MODIFIED=true" >> $GITHUB_OUTPUT
@@ -39,6 +42,7 @@ runs:
 
     - name: Commit updated CONTRIBUTORS
       if: steps.git-check.outputs.FILE_MODIFIED == 'true'
+      shell: bash
       run: |
         git add CONTRIBUTORS
         git commit -m "chore: update CONTRIBUTORS"
