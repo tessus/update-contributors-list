@@ -22,7 +22,7 @@ runs:
     - name: Retrieve contributors and update file
       shell: bash
       run: |
-        git log --pretty='%an <%ae>' |sort -uf |grep -v "\[bot\]" >CONTRIBUTORS
+        git log |git shortlog -se |tr '\t' ':' |cut -d: -f2- |sort -uf |sed '/\[bot\]/d' >CONTRIBUTORS
 
     - name: Setup git config
       shell: bash
