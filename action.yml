@@ -4,6 +4,31 @@ author: 'Helmut K. C. Tessarek <tessarek@evermeet.cx>'
 branding:
   icon: 'list'
   color: 'blue'
+inputs:
+  sort-by:
+    description: 'Sort contributors by: name, commits, auto'
+    required: false
+    default: 'auto'
+  sort-by-auto-threshold:
+    description: 'If sort-by=auto, it determines at which number of contributors the list is sorted by name.'
+    required: false
+    default: 30
+  commit-message:
+    description: 'The commit message for updating the file.'
+    required: false
+    default: 'chore: update CONTRIBUTORS'
+  committer-name:
+    description: 'The name of the committer.'
+    required: false
+    default: 'github-actions[bot]'
+  committer-email:
+    description: 'The email address of the committer.'
+    required: false
+    default: 'github-actions[bot]@users.noreply.github.com'
+  exclude:
+    description: 'A comma separated list of case-insensitive and literal patterns to exclude from the list.'
+    required: false
+    default: '[bot]'
 runs:
   using: "composite"
   steps:
@@ -19,16 +44,40 @@ runs:
       with:
         fetch-depth: 0
 
-    - name: Retrieve contributors and update file
+    - name: Retrieve contributors
       shell: bash
       run: |
-        git log |git shortlog -se |tr '\t' ':' |cut -d: -f2- |sort -uf |sed '/\[bot\]/d' >CONTRIBUTORS
+        git log |git shortlog -sen |tr '\t' ':' |cut -d: -f2- >CONTRIBUTORS
+
+    - name: Exclude patterns
+      shell: bash
+      run: |
+        while read -r pattern
+        do
+          cat CONTRIBUTORS |grep -Fiv "$pattern" >CONTRIBUTORS.new
+          mv CONTRIBUTORS.new CONTRIBUTORS
+        done <<< $(echo "${{ inputs.exclude }}" |tr ',' "\n")
+
+    - name: Retrieve the number of contributors
+      id: num-contrib
+      shell: bash
+      run: |
+        NUM=$(cat CONTRIBUTORS |wc -l |xargs)
+        echo "NUM_CONTRIB=$NUM" >> $GITHUB_OUTPUT
+
+    - name: To sort, or not to sort, that is the question
+      shell: bash
+      run: |
+        if [[ ("${{ inputs.sort-by }}" == "auto" && ${{ steps.num-contrib.outputs.NUM_CONTRIB }} -gt ${{ inputs.sort-by-auto-threshold }}) || "${{ inputs.sort-by }}" == "name" ]]; then
+          cat CONTRIBUTORS |sort -uf >CONTRIBUTORS.sorted
+          mv CONTRIBUTORS.sorted CONTRIBUTORS
+        fi
 
     - name: Setup git config
       shell: bash
       run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git config user.name "${{ inputs.committer-name }}"
+        git config user.email "${{ inputs.committer-email }}"
 
     - name: Check for modified file
       id: git-check
@@ -45,5 +94,5 @@ runs:
       shell: bash
       run: |
         git add CONTRIBUTORS
-        git commit -m "chore: update CONTRIBUTORS"
+        git commit -m "${{ inputs.commit-message }}"
         git push
